@@ -9,45 +9,6 @@ from model import CollisionNet, SDF
 from train import train, EMA, DictEMA, evaluate
 
 
-# def sweep_x_dim(args):
-#     objs = random_objects(args.n_objs)
-#     batch_fn = lambda: get_batch(objs, args.n_batch)
-#     loss_fn = nn.BCEWithLogitsLoss()
-
-#     x_dims = (np.logspace(0,2,20).astype(int) * 3)
-#     final_accs = []
-
-#     for x_dim in x_dims:
-#         print(f"Training a model with x_dim = {x_dim}")
-#         model = CollisionNet(args.n_objs, sdf=SDF(x_dim=x_dim))
-#         accs = train(model, args.n_iters, batch_fn, loss_fn,
-#             optim.Adam(model.parameters(), lr=1e-5))
-#         final_accs.append(accs[-1])
-
-#     plt.plot(x_dims, final_accs)
-#     plt.xlabel("x_dim")
-#     plt.ylabel("Accuracy")
-#     plt.show()
-
-
-# def compare_apply_transform(args):
-#     objs = random_objects(args.n_objs)
-#     batch_fn = lambda: get_batch(objs, args.n_batch)
-#     loss_fn = nn.BCEWithLogitsLoss()
-
-#     for apply_transform in [True, False]:
-#         print(f"Training a model with apply_transform = {apply_transform}")
-#         model = CollisionNet(args.n_objs, sdf=SDF(apply_transform=apply_transform))
-#         losses = train(model, args.n_iters, batch_fn, loss_fn,
-#             optim.Adam(model.parameters(), lr=1e-5))
-#         plt.plot(losses, label=f"apply_transform = {apply_transform}", alpha=0.5)
-
-#     plt.xlabel("Batch")
-#     plt.ylabel("Accuracy")
-#     plt.legend()
-#     plt.show()
-
-
 def plot_training_run(args):
     objs = random_objects(args.n_objs)
     model = CollisionNet(args.n_objs)
