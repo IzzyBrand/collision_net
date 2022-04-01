@@ -2,6 +2,13 @@
 
 Checking collision with a neural network.
 
+![The results from running `python run.py --n-objects=10 --n-iters=1000 --n-batch=1000`](figures/collision_net_metrics.png)
+
+We want to use neural networks to check collision for a few reasons
+
+ * They might be faster than mesh-based collision checkers
+ * They can produce collision gradients
+
 ## Running stuff
 
  * `python run.py` will train a collision net and plot some performance metrics
