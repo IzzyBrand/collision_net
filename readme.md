@@ -29,7 +29,7 @@ virtualenv -p python3 venv
 Then you can install the requirements.
 
 ```
-pip install torch ray tqdm matplotlib numpy scipy python-fcl
+pip install torch ray["tune"] tqdm matplotlib numpy scipy python-fcl
 ```
 
  * `scipy` is used for generating random rotations and finite difference gradients
