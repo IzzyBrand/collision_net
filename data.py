@@ -92,8 +92,8 @@ def get_batch(objs, n, return_gradient=False):
 
 
 if __name__ == "__main__":
-    objs = random_objects(10)
-    batch = get_batch(objs, 100)
+    objs = random_objects(50)
+    batch = get_batch(objs, 1000)
 
     import matplotlib.pyplot as plt
     plt.hist(batch[3].numpy(), bins=50)

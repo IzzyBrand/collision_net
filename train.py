@@ -32,28 +32,26 @@ class DictEMA(EMA):
 
 def gradient_metrics(model, batch):
     o1, o2, T, label, dlabel_dT = batch
-    T = nn.Parameter(T)
+    T = nn.Parameter(T)  # Make T a parameter so we can get the gradient
     model(o1, o2, T).sum().backward()
     dpred_dT = T.grad.detach()
-    # Both matrices should be [N x 4 x 4]
-    # Bottom row of the transform matrix is all zeros b/c homogenous coords
-    # dlabel_dT = dlabel_dT[:, :3].view(-1, 12)
-    # dpred_dT = dpred_dT[:, :3].view(-1, 12)
-    # Compute the angle between the vectors
-    # label_norm = torch.linalg.norm(dlabel_dT)
-    # pred_norm = torch.linalg.norm(dpred_dT)
-    # dot_norm = (dlabel_dT * dpred_dT).sum(axis=1) / (label_norm * pred_norm)
+
+    # Change in distance wrt relative position
     dpred_dpos = dpred_dT[:, :3, 3]
     dlabel_dpos = dlabel_dT[:, :3, 3]
+    # Change in distance wrt relative orientation
+    dpred_drot = dpred_dT[:, :3, :3].flatten(1)
+    dlabel_drot = dlabel_dT[:, :3, :3].flatten(1)
 
+    # Computes the angle between two vectors in radians
     def angle(v1, v2):
         return torch.arccos(nn.CosineSimilarity()(v1, v2)).mean()
 
     return {
-        # "grad_angle": torch.arccos(dot_norm).mean().item(),
-        # "grad_norm": f.l1_loss(dpred_dT, dlabel).item(),
         "grad_pos_l1": f.l1_loss(dpred_dpos, dlabel_dpos).item(),
         "grad_pos_angle": angle(dpred_dpos, dlabel_dpos).item(),
+        "grad_rot_l1": f.l1_loss(dpred_drot, dlabel_drot).item(),
+        "grad_rot_angle": angle(dpred_drot, dlabel_drot).item(),
     }
 
 
