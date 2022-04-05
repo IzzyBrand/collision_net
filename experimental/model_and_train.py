@@ -1,7 +1,7 @@
 from jax import random, value_and_grad, jit, grad
 import jax.numpy as jnp
 from jax.nn import sigmoid, relu, silu, initializers
-from matplotlib import pyplot as plt
+import optax
 
 from data import get_batch, random_objects
 
@@ -52,23 +52,19 @@ def collision_net(params, i, j, T):
                          T.reshape(-1, 16)], axis=1)
     return mlp_forward(mlp_params, x)
 
-def step(params, grad, lr=-1e-3):
-    """Update a nested list or tuple of jnp arrays"""
-    if isinstance(params, jnp.ndarray):
-        return params + lr * grad
-    elif isinstance(params, list):
-        return [step(p, g, lr) for p, g in zip(params, grad)]
-    elif isinstance(params, tuple):
-        return tuple(step(p, g, lr) for p, g in zip(params, grad))
-
-def train(params, n_iters, batch_fn, loss_fn, eval_fn=None):
+def train(params, n_iters, batch_fn, loss_fn, optimizer, eval_fn=None):
     """Run the training loop"""
-    loss_and_grad = jit(value_and_grad(loss_fn, argnums=0))
+    opt_state = optimizer.init(params)
+    loss_and_grad_fn = jit(value_and_grad(loss_fn))
     losses, metrics = [], []
+
     for i in range(n_iters):
-        loss, grad = loss_and_grad(params, batch_fn())
-        params = step(params, grad)
-        losses.append(loss)
+        loss, grads = loss_and_grad_fn(params, batch_fn())
+        # params = step(params, grads)
+        # losses.append(loss)
+
+        updates, opt_state = optimizer.update(grads, opt_state)
+        params = optax.apply_updates(params, updates)
 
         if eval_fn: metrics.append(eval_fn(params))
         print(f"Iteration {i}. Loss:\t{loss}")
@@ -78,42 +74,3 @@ def train(params, n_iters, batch_fn, loss_fn, eval_fn=None):
 def jnp_batch(*args, **kwargs):
     """Convert a batch of tensors to a batch of jnp arrays"""
     return [jnp.array(d.numpy()) for d in get_batch(*args, **kwargs)]
-
-def supervise_gradients():
-    n_objs = 10
-    n_batch = 500
-    n_eval = 100
-    n_iters = 50
-    alpha = 0.1 # Weighting between gradient loss and distance loss
-
-    objs = random_objects(n_objs)
-    batch_fn = lambda: jnp_batch(objs, n_batch, grad=True)
-    params = collision_net_params([64, 64], n_objs, 30) # Init the network
-
-    summed_net = lambda *args: collision_net(*args).sum()
-    grad_net = jit(grad(summed_net, argnums=3)) # Returns d_pred/d_T
-
-    def loss_fn(params, batch):
-        inputs = batch[:3]
-        labels, label_grads = batch[3:]
-        preds = collision_net(params, *inputs)
-        pred_grads = grad_net(params, *inputs)
-        return (1. - alpha) * l2(preds, labels) + alpha * l2(pred_grads, label_grads)
-
-    def eval_fn(params):
-        batch = jnp_batch(objs, n_eval, grad=False)
-        inputs = batch[:3]
-        labels = batch[3]
-        preds = collision_net(params, *inputs)
-        acc = (jnp.sign(labels) == jnp.sign(preds)).mean()
-        # label_grads = batch[4]
-        # pred_grads = grad_net(params, *inputs)
-        return acc.item()
-
-    params, losses, metrics = train(params, n_iters, batch_fn, loss_fn, eval_fn)
-    plt.plot(losses)
-    plt.plot(metrics)
-    plt.show()
-
-if __name__ == "__main__":
-    supervise_gradients()
