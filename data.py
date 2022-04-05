@@ -70,7 +70,7 @@ def distance_grad(o1, o2, T):
     return approx_fprime(T.ravel(),
         lambda x: distance(o1, o2, x.reshape(4,4))).reshape(4,4)
 
-def get_batch(objs, n, return_gradient=False):
+def get_batch(objs, n, grad=False):
     # Random transforms
     Ts = random_transforms(n)
     # Random pairs of objects
@@ -83,7 +83,7 @@ def get_batch(objs, n, return_gradient=False):
              torch.Tensor(Ts),
              torch.Tensor(ds)]
 
-    if return_gradient:
+    if grad:
         dds = np.array([distance_grad(objs[i], objs[j], T)\
             for i, j, T in zip(*pairs, Ts)])
         batch.append(torch.Tensor(dds))

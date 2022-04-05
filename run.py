@@ -12,7 +12,7 @@ from train import train, EMA, DictEMA, evaluate
 def plot_training_run(args):
     objs = random_objects(args.n_objs)
     model = CollisionNet(args.n_objs)
-    eval_batch_fn = lambda: get_batch(objs, args.n_eval, return_gradient=(not args.no_fcl_gradient))
+    eval_batch_fn = lambda: get_batch(objs, args.n_eval, grad=(not args.no_fcl_gradient))
 
     losses, metrics = train(model=model,
                             n_iters=args.n_iters,

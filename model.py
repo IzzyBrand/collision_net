@@ -3,12 +3,12 @@ from torch import nn
 
 
 class MLP(nn.Module):
-    def __init__(self, layer_dims, nonlinearity=nn.ReLU()):
+    def __init__(self, layer_dims, nonlin=nn.ReLU()):
         """Simple fully-connected feed forward network
 
         Args:
             layer_dims (list(int)): List of layer dims (including inputt and out)
-            nonlinearity (nn.Module, optional): nonlinearity function
+            nonlin (nn.Module, optional): nonlin function
         """
         super(MLP, self).__init__()
 
@@ -17,7 +17,7 @@ class MLP(nn.Module):
         for i in range(n_layers):
             _layers.append(nn.Linear(layer_dims[i], layer_dims[i+1]))
 
-            if i < n_layers - 1: _layers.append(nonlinearity)
+            if i < n_layers - 1: _layers.append(nonlin)
 
         self.layer_dims = layer_dims
         self.layers = nn.Sequential(*_layers)
@@ -31,7 +31,8 @@ class SDF(nn.Module):
                  x_dim=48,
                  apply_transform=True,
                  h_dims=[96, 96],
-                 transform_shape=torch.Size([4,4])):
+                 transform_shape=torch.Size([4,4]),
+                 nonlin=nn.ReLU()):
         """Computes the signed distance function between two objects
         represented as embedding vectors.
 
@@ -40,6 +41,7 @@ class SDF(nn.Module):
             apply_transform (bool, optional): Transform embedding before MLP
             h_dims (list, optional): Network hidden layer dimensions
             transform_shape (torch.Size, optional): Transform format
+            nonlin (nn.Module, optional): Nonlinearity
         """
         super(SDF, self).__init__()
 
@@ -54,7 +56,7 @@ class SDF(nn.Module):
         # Create a neural network that implements the SDF
         first_layer_dim = 2 * x_dim + (not apply_transform) * transform_shape.numel()
         last_layer_dim = 1
-        self.mlp = MLP([first_layer_dim] + h_dims + [last_layer_dim])
+        self.mlp = MLP([first_layer_dim] + h_dims + [last_layer_dim], nonlin)
 
 
     def forward(self, x1, x2, T):

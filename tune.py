@@ -15,10 +15,10 @@ obj_params = random_object_params(50)
 # 1. Define an objective function.
 def objective(config):
 
-    hdims = [config[f"l{i}"] for i in range(1, config["n_layers"])]
     sdf = SDF(x_dim=config["x_dim"],
               apply_transform=config["apply_transform"],
-              h_dims=hdims)
+              h_dims=[config["l1"], config["l2"]],
+              nonlin=config["nonlin"])
     model = CollisionNet(config["n_objs"],
                          sdf=sdf,
                          mirror=config["mirror"])
@@ -50,12 +50,23 @@ search_space = {
     "x_dim": tune.qlograndint(3, 150, 3),
     "l1": tune.lograndint(8, 257),
     "l2": tune.lograndint(8, 257),
-    "l3": tune.lograndint(8, 257),
-    "l4": tune.lograndint(8, 257),
-    "n_layers": tune.randint(1, 5),
+    "nonlin": tune.choice([nn.ReLU(), nn.Sigmoid(), nn.SiLU(), nn.Tanh()]),
+    # These two parameters are not tuned.
     "n_objs": len(obj_params),
     "n_iters": 1000,
 }
+
+# These are settings I've found to work well. Uncomment these lines, and the
+# hyperparams will not be tuned.
+# search_space["lr"] = 1e-3
+# search_space["weight_decay"] = 1e-8
+# search_space["n_batch"] = 1000
+# search_space["mirror"] = True
+# search_space["apply_transform"] = True
+# search_space["x_dim"] = 30
+# search_space["l1"] = 128
+# search_space["l2"] = 128
+# search_space["nonlin"] =  nn.ReLU()
 
 scheduler = ASHAScheduler(max_t=search_space["n_iters"],
                           grace_period=10,
@@ -69,7 +80,7 @@ analysis = tune.run(objective,
                     mode="max",
                     scheduler=scheduler,
                     search_alg=algo,
-                    num_samples=300,
+                    num_samples=100,
                     verbose=1)
 
 print(analysis.get_best_config(metric="acc", mode="max"))
