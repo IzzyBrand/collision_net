@@ -8,7 +8,7 @@ from ray.tune.suggest.hyperopt import HyperOptSearch
 
 from data import random_object_params, objects_from_params, get_batch
 from model import CollisionNet
-from train import training_step, DictEMA, evaluate
+from train import training_step, DictEMA, evaluate, make_loss_fn
 
 obj_params = random_object_params(50)
 
@@ -23,7 +23,7 @@ def objective(config):
 
     objs = objects_from_params(obj_params)
     batch_fn = lambda: get_batch(objs, config["n_batch"])
-    loss_fn = nn.MSELoss()
+    loss_fn = make_loss_fn(nn.MSELoss())
 
     optimizer = optim.Adam(model.parameters(),
                            lr=config["lr"],

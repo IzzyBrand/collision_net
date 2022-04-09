@@ -45,7 +45,7 @@ def gradient_metrics(model, batch):
 
     # Computes the angle between two vectors in radians
     def angle(v1, v2):
-        return torch.arccos(nn.CosineSimilarity()(v1, v2)).mean()
+        return torch.rad2deg(torch.arccos(nn.CosineSimilarity()(v1, v2))).mean()
 
     return {
         "grad_pos_l1": f.l1_loss(dpred_dpos, dlabel_dpos).item(),
@@ -53,6 +53,17 @@ def gradient_metrics(model, batch):
         "grad_rot_l1": f.l1_loss(dpred_drot, dlabel_drot).item(),
         "grad_rot_angle": angle(dpred_drot, dlabel_drot).item(),
     }
+
+
+def make_loss_fn(L):
+    """Convert a typical L(pred, target) loss function into a more generic
+    loss_fn(model, batch) format"""
+    def loss_fn(model, batch):
+        o1, o2, T, label = batch[:4]
+        pred = model(o1, o2, T)
+        return L(pred, label)
+
+    return loss_fn
 
 
 def evaluate(model, batch):
@@ -74,11 +85,8 @@ def evaluate(model, batch):
 
 def training_step(model, batch_fn, loss_fn, optimizer):
     optimizer.zero_grad()
-
-    o1, o2, T, label = batch_fn()
-    pred = model(o1, o2, T)
-    loss = loss_fn(pred, label)
-
+    batch = batch_fn()
+    loss = loss_fn(model, batch)
     loss.backward()
     optimizer.step()
 
@@ -89,11 +97,18 @@ def train(model, n_iters, batch_fn, loss_fn, optimizer, eval_fn=None, verbose=Tr
     losses, metrics = [], []
 
     pbar = tqdm(range(n_iters), disable=(not verbose))
-    for n in pbar:
-        loss = training_step(model, batch_fn, loss_fn, optimizer)
-        losses.append(loss)
+    try:
+        for n in pbar:
+            loss = training_step(model, batch_fn, loss_fn, optimizer)
+            losses.append(loss)
 
-        if eval_fn: metrics.append(eval_fn(model))
-        pbar.set_postfix({'Loss': loss})
+            if eval_fn:
+                metric = eval_fn(model)
+                metrics.append(metric)
+                pbar.set_postfix({'Acc': metric['acc']})
+            else:
+                pbar.set_postfix({'Loss': loss})
+    except KeyboardInterrupt:
+        pass
 
     return (losses, metrics) if eval_fn else losses
