@@ -5,7 +5,7 @@ import numpy as np
 from torch import nn, optim
 
 from data import random_objects, get_batch
-from model import CollisionNet, SDF
+from model import CollisionNet
 from train import train, EMA, DictEMA, evaluate
 
 

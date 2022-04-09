@@ -7,21 +7,19 @@ from ray.tune.suggest import ConcurrencyLimiter
 from ray.tune.suggest.hyperopt import HyperOptSearch
 
 from data import random_object_params, objects_from_params, get_batch
-from model import CollisionNet, SDF
+from model import CollisionNet
 from train import training_step, DictEMA, evaluate
 
 obj_params = random_object_params(50)
 
 # 1. Define an objective function.
 def objective(config):
-
-    sdf = SDF(x_dim=config["x_dim"],
-              apply_transform=config["apply_transform"],
-              h_dims=[config["l1"], config["l2"]],
-              nonlin=config["nonlin"])
     model = CollisionNet(config["n_objs"],
-                         sdf=sdf,
-                         mirror=config["mirror"])
+                         mirror=config["mirror"],
+                         apply_transform=config["apply_transform"],
+                         x_dim=config["x_dim"],
+                         h_dims=[config["l1"], config["l2"]],
+                         nonlin=config["nonlin"])
 
     objs = objects_from_params(obj_params)
     batch_fn = lambda: get_batch(objs, config["n_batch"])

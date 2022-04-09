@@ -26,90 +26,52 @@ class MLP(nn.Module):
         return self.layers(x)
 
 
-class SDF(nn.Module):
+class CollisionNet(nn.Module):
     def __init__(self,
-                 x_dim=48,
+                 n_objs,
+                 mirror=True,
                  apply_transform=True,
+                 x_dim=48,
                  h_dims=[96, 96],
-                 transform_shape=torch.Size([4,4]),
                  nonlin=nn.ReLU()):
-        """Computes the signed distance function between two objects
-        represented as embedding vectors.
+        """Predicts collisions between pairs of objects
 
         Args:
-            x_dim (int, optional): Embedding dimension
+            n_objs (int): Number of objects
+            mirror (bool, optional): Return mean dist(x1, x2), dist(x2, x1)
             apply_transform (bool, optional): Transform embedding before MLP
-            h_dims (list, optional): Network hidden layer dimensions
-            transform_shape (torch.Size, optional): Transform format
-            nonlin (nn.Module, optional): Nonlinearity
+            x_dim (int, optional): Dimension of geometry embedding
+            h_dims (list(int), optional): Witdths of hidden layers
+            nonlin (nn.Module, optional): nonlinearity to use in mlp
         """
-        super(SDF, self).__init__()
+        super(CollisionNet, self).__init__()
 
         if apply_transform:
             assert x_dim % 3 == 0, "x_dim must be a multiple of three."
-            assert transform_shape == torch.Size([4,4]), "transform_shape must be [4 x 4]."
 
         self.x_dim = x_dim
+        self.n_objs = n_objs
+        self.mirror = mirror
         self.apply_transform = apply_transform
-        self.transform_shape = transform_shape
-
+        # A tensor of geometry embeddings
+        self.geoms = nn.Parameter(torch.zeros(self.n_objs, self.x_dim))
         # Create a neural network that implements the SDF
-        first_layer_dim = 2 * x_dim + (not apply_transform) * transform_shape.numel()
+        first_layer_dim = 2 * x_dim + (not apply_transform) * 12
         last_layer_dim = 1
         self.mlp = MLP([first_layer_dim] + h_dims + [last_layer_dim], nonlin)
 
-
-    def forward(self, x1, x2, T):
-        """Compute the SDF between two objects given their relative transform.
+    def forward(self, o1, o2, T, mirrored=False):
+        """Compute distance between object o1 and o2
 
         If self.apply_transform is true, x2 will be transformed into the frame
         x1 before passing both embeddings into the network. Otherwise, the
         embeddings are not rotated, and the transform is passed into the network.
 
         Args:
-            x1 (torch.Tensor): [N x D] batch of vectors
-            x2 (torch.Tensor): [N x D] batch of vectors
-            T (torch.Tensor): [N x 4 x 4] batch of transforms (from 1 to 2)
-
-        Returns:
-            torch.Tensor: Distances
-        """
-        if self.apply_transform:
-            x2 = apply_transforms_to_embeddings(x2, T)
-            x = torch.cat([x1, x2], dim=1)
-        else:
-            x = torch.cat([x1, x2, torch.flatten(T, start_dim=1)], dim=1)
-
-        return self.mlp(x).squeeze()
-
-
-class CollisionNet(nn.Module):
-    def __init__(self,
-                 n_objs,
-                 sdf=SDF(),
-                 mirror=True):
-        """Predicts collisions between pairs of objects
-
-        Args:
-            n_objs (int): Number of objects
-            sdf (nn.Module, optional): Computes SDF between two geoms
-            mirror (bool, optional): Return mean SDF(x1, x2) and SDF(x2, x1)
-        """
-        super(CollisionNet, self).__init__()
-
-        self.n_objs = n_objs
-        self.sdf = sdf
-        self.mirror = mirror
-        self.geoms = nn.Parameter(torch.zeros(self.n_objs, self.sdf.x_dim))
-
-
-    def forward(self, o1, o2, T):
-        """Compute distance between object o1 and o2
-
-        Args:
-            o1 (torch.Tensor): Index of first object
-            o2 (torch.Tensor): Index of second object
-            T (torch.Tensor): Transform from first to second object
+            o1 (torch.Tensor): [N] Index of first object
+            o2 (torch.Tensor): [N] Index of second object
+            T (torch.Tensor): [N x 4 x 4] Transform from first to second object
+            mirrored (bool, optional): Indicates whether inputs were swapped
 
         Returns:
             torch.Tensor: Min distance between geoms
@@ -117,11 +79,23 @@ class CollisionNet(nn.Module):
         x1 = self.geoms[o1]
         x2 = self.geoms[o2]
 
-        if self.mirror:
-            T_inv = torch.inverse(T)
-            return 0.5 * (self.sdf(x1, x2, T) + self.sdf(x2, x1, T_inv))
+        if self.apply_transform:
+            x2 = apply_transforms_to_embeddings(x2, T)
+            x = torch.cat([x1, x2], dim=1)
         else:
-            return self.sdf(x1, x2, T)
+            # Convert [N x 4 x 4] to [N x 12] by dropping bottom row
+            flat_T = torch.flatten(T[:, :3, :], start_dim=1)
+            x = torch.cat([x1, x2, flat_T], dim=1)
+
+        d_1_2 = self.mlp(x).squeeze()
+
+        if self.mirror and not mirrored:
+            T_inv = torch.inverse(T)
+            # Set mirrored=True to avoid infinite recursion
+            d_2_1 = self.forward(o2, o1, T_inv, mirrored=True)
+            return 0.5 * (d_1_2 + d_2_1)
+        else:
+            return d_1_2
 
 
 def apply_transforms_to_embeddings(x, T):
