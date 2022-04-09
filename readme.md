@@ -46,7 +46,7 @@ Install the jax and run the experimental training script:
 
 ```
 pip install jax jaxlib
-python -m experimental.supervise_gradients
+python -m experimental.run
 ```
 
 **Note:** currently the network trains, but the collision classification accuracy does not improve. There are likely some bugs somewhere -- maybe a flipped sign.
